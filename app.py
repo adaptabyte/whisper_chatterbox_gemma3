@@ -21,16 +21,45 @@ asr_model = pipeline(
 )
 
 # —– Load / Cache TTS Model —–
-TTS_MODEL = ChatterboxTTS.from_pretrained(device="cuda")
+TTS_MODEL = None
+
+def get_or_load_tts():
+    global TTS_MODEL
+    if TTS_MODEL is None:
+        print("Loading TTS model...")
+        TTS_MODEL = ChatterboxTTS.from_pretrained(DEVICE)
+        if hasattr(TTS_MODEL, "to"):
+            TTS_MODEL.to(DEVICE)
+    return TTS_MODEL
 
 # —– Load / Cache Local Chat Model (Gemma 3) —–
-CHAT_TOKENIZER = AutoTokenizer.from_pretrained("google/gemma-3-1b-it")
-CHAT_MODEL = Gemma3ForCausalLM.from_pretrained(
+CHAT_TOKENIZER = None
+CHAT_MODEL = None
+
+def get_or_load_chat_model():
+    """Loads Google Gemma 3-1B with 8-bit on GPU or full precision on CPU."""
+    global CHAT_TOKENIZER, CHAT_MODEL
+    if CHAT_MODEL is None:
+        model_id = "google/gemma-3-1b-it"
+        if DEVICE == "cuda":
+            print("Loading Gemma 3 (1B) in 8-bit...")
+            quant_cfg = BitsAndBytesConfig(load_in_8bit=True)
+            CHAT_MODEL = Gemma3ForCausalLM.from_pretrained(
                 model_id,
                 quantization_config=quant_cfg,
                 device_map="auto",
                 use_auth_token=True,
-                ).eval()
+            ).eval()
+        else:
+            print("No CUDA detected; loading Gemma 3 (1B) in full precision (FP32). This may be slow.")
+            CHAT_MODEL = Gemma3ForCausalLM.from_pretrained(
+                model_id,
+                device_map="auto",
+                use_auth_token=True,
+            ).eval()
+            CHAT_MODEL.to(DEVICE)
+        CHAT_TOKENIZER = AutoTokenizer.from_pretrained(model_id)
+    return CHAT_TOKENIZER, CHAT_MODEL
 
 # —– Utilities —–
 def transcribe(audio_path: str) -> str:
