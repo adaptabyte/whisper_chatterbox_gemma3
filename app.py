@@ -118,7 +118,9 @@ def respond_to_audio(
     temperature: float = 0.8,
     seed_num: int = 0,
     cfgw: float = 0.5,
-) -> tuple[tuple[int, np.ndarray], list]:
+):
+    """Generate a reply and stream the spoken response."""
+
     # 1) Transcribe user audio → text
     user_text = transcribe(audio_input_path)
     print(f"ASR result: {user_text}")
@@ -127,7 +129,7 @@ def respond_to_audio(
     bot_text, new_history = generate_chat_response(history, user_text)
     print(f"Chat response: {bot_text}")
 
-    # 3) Synthesize response text → speech
+    # 3) Synthesize response text → speech (streaming)
     tts = get_or_load_tts()
     if seed_num:
         set_seed(int(seed_num))
@@ -135,13 +137,18 @@ def respond_to_audio(
         "exaggeration": exaggeration,
         "temperature": temperature,
         "cfg_weight": cfgw,
+        "chunk_size": 25,
     }
-    wav = tts.generate(
+
+    audio_chunks = []
+    for chunk, metrics in tts.generate_stream(
         bot_text,
         audio_prompt_path=audio_input_path,
-        **generate_kwargs
-    )
-    return (tts.sr, wav.squeeze(0).numpy()), new_history
+        **generate_kwargs,
+    ):
+        audio_chunks.append(chunk)
+        full_audio = torch.cat(audio_chunks, dim=-1)
+        yield (tts.sr, full_audio.squeeze(0).numpy()), new_history
 
 # —– Gradio Interface —–
 with gr.Blocks() as demo:
@@ -157,7 +164,7 @@ with gr.Blocks() as demo:
             # hidden state to keep conversation history
             history      = gr.State([])
         with gr.Column():
-            audio_out = gr.Audio(label="Chatterbox Replies")
+            audio_out = gr.Audio(label="Chatterbox Replies", streaming=True)
     btn.click(
         fn=respond_to_audio,
         inputs=[audio_in, history, exaggeration, temp, seed_num, cfgw],
