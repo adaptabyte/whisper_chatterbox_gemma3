@@ -4,7 +4,7 @@ import torch
 from transformers import pipeline, AutoTokenizer, BitsAndBytesConfig, TextIteratorStreamer
 from transformers import Gemma3ForCausalLM
 import threading
-from chatterbox.src.chatterbox.tts import ChatterboxTTS
+from src.chatterbox.tts import ChatterboxTTS
 import gradio as gr
 import spaces
 
