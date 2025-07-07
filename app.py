@@ -4,6 +4,7 @@ import torch
 from transformers import pipeline, AutoTokenizer, BitsAndBytesConfig, TextIteratorStreamer
 from transformers import Gemma3ForCausalLM
 import threading
+# Using a minimal stub TTS implementation to avoid missing dependency
 from src.chatterbox.tts import ChatterboxTTS
 import gradio as gr
 import spaces
